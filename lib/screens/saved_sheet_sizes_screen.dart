@@ -4,6 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:cartpress_smartsheet/drawers/app_drawer.dart';
 import 'package:cartpress_smartsheet/screens/sheet_size_screen.dart';
 import 'package:cartpress_smartsheet/screens/ink_report_screen.dart';
+import 'package:photo_view/photo_view.dart';
 
 class SavedSheetSizesScreen extends StatefulWidget {
   const SavedSheetSizesScreen({super.key});
@@ -21,38 +22,39 @@ class _SavedSheetSizesScreenState extends State<SavedSheetSizesScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => InkReportScreen(initialData: {
-          'date':
-              "${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}",
-          'clientName': record['clientName'],
-          'product': record['productName'],
-          'productCode': record['productCode'],
-          'dimensions': {
-            'length': record['length'],
-            'width': record['width'],
-            'height': record['height'],
+        builder: (context) => InkReportScreen(
+          initialData: {
+            'date':
+                "${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}",
+            'clientName': record['clientName'] ?? '',
+            'product': record['productName'] ?? '',
+            'productCode': record['productCode'] ?? '',
+            'dimensions': {
+              'length': record['length']?.toString() ?? '0',
+              'width': record['width']?.toString() ?? '0',
+              'height': record['height']?.toString() ?? '0',
+            },
+            'imagePaths': record['imagePaths'] is List<String>
+                ? List<String>.from(record['imagePaths'])
+                : [],
+            'colors': [],
+            'quantity': '',
+            'notes': '',
           },
-          'colors': [],
-          'quantity': '',
-          'notes': '',
-          'imagePaths': record['imagePaths'] ?? [],
-        }),
+        ),
       ),
     );
   }
 
   void _showSizeDetails(BuildContext context, Map record) {
-    // حساب طول وعرض الشيت
-    double length = double.tryParse(record['length']?.toString() ?? '0') ?? 0;
-    double width = double.tryParse(record['width']?.toString() ?? '0') ?? 0;
-    double height = double.tryParse(record['height']?.toString() ?? '0') ?? 0;
-
+    double length = double.tryParse(record['length']?.toString() ?? '0') ?? 0.0;
+    double width = double.tryParse(record['width']?.toString() ?? '0') ?? 0.0;
+    double height = double.tryParse(record['height']?.toString() ?? '0') ?? 0.0;
     bool isFullSize = record['isFullSize'] ?? true;
     bool isQuarterSize = record['isQuarterSize'] ?? false;
     bool isOverFlap = record['isOverFlap'] ?? false;
     bool isTwoFlap = record['isTwoFlap'] ?? true;
     bool addTwoMm = record['addTwoMm'] ?? false;
-
     double sheetLength = 0.0;
     double sheetWidth = 0.0;
     String productionWidth1 = '';
@@ -107,43 +109,48 @@ class _SavedSheetSizesScreenState extends State<SavedSheetSizesScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("تفاصيل المقاس"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("📏 طول الشيت: ${sheetLength.toStringAsFixed(2)} سم"),
-            Text("📐 عرض الشيت: ${sheetWidth.toStringAsFixed(2)} سم"),
-            const SizedBox(height: 16),
-            const Text("🔧 مقاسات خط الإنتاج",
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            Table(
-              border: TableBorder.all(),
-              children: [
-                TableRow(
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("📏 طول الشيت: ${sheetLength.toStringAsFixed(2)} سم"),
+              Text("📐 عرض الشيت: ${sheetWidth.toStringAsFixed(2)} سم"),
+              const SizedBox(height: 16),
+              const Text("🔧 مقاسات خط الإنتاج",
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              SizedBox(
+                width: double.infinity,
+                child: Table(
+                  border: TableBorder.all(),
                   children: [
-                    TableCell(
-                      child: Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Center(child: Text(productionWidth1)),
-                      ),
-                    ),
-                    TableCell(
-                      child: Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Center(child: Text(productionHeight)),
-                      ),
-                    ),
-                    TableCell(
-                      child: Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Center(child: Text(productionWidth2)),
-                      ),
+                    TableRow(
+                      children: [
+                        TableCell(
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Center(child: Text(productionWidth1)),
+                          ),
+                        ),
+                        TableCell(
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Center(child: Text(productionHeight)),
+                          ),
+                        ),
+                        TableCell(
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Center(child: Text(productionWidth2)),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
         actions: [
           TextButton(
@@ -151,6 +158,41 @@ class _SavedSheetSizesScreenState extends State<SavedSheetSizesScreen> {
             child: const Text("حسنًا"),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showFullScreenImage(BuildContext context, List<String> imagePaths) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        color: Colors.black,
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            PageView.builder(
+              itemCount: imagePaths.length,
+              itemBuilder: (context, index) {
+                return Center(
+                  child: PhotoView(
+                    imageProvider: FileImage(File(imagePaths[index])),
+                    minScale: PhotoViewComputedScale.contained * 0.8,
+                    maxScale: PhotoViewComputedScale.covered * 2.5,
+                  ),
+                );
+              },
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                onPressed: Navigator.of(context).pop,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -255,6 +297,8 @@ class _SavedSheetSizesScreenState extends State<SavedSheetSizesScreen> {
                       ? List<String>.from(record['imagePaths'])
                       : [];
 
+              final key = filteredRecords[idx]['key'];
+
               return Card(
                 margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                 child: ListTile(
@@ -294,19 +338,22 @@ class _SavedSheetSizesScreenState extends State<SavedSheetSizesScreen> {
                                       if (snapshot.connectionState ==
                                           ConnectionState.waiting) {
                                         return const SizedBox.square(
-                                          dimension: 50,
-                                          child: Center(
-                                              child:
-                                                  CircularProgressIndicator()),
-                                        );
+                                            dimension: 50,
+                                            child: Center(
+                                                child:
+                                                    CircularProgressIndicator()));
                                       }
                                       if (snapshot.hasData &&
                                           snapshot.data == true) {
-                                        return Image.file(
-                                          File(imagePath),
-                                          width: 50,
-                                          height: 50,
-                                          fit: BoxFit.cover,
+                                        return GestureDetector(
+                                          onTap: () => _showFullScreenImage(
+                                              context, imagePaths),
+                                          child: Image.file(
+                                            File(imagePath),
+                                            width: 50,
+                                            height: 50,
+                                            fit: BoxFit.cover,
+                                          ),
                                         );
                                       } else {
                                         return const Icon(Icons.broken_image,
@@ -324,7 +371,6 @@ class _SavedSheetSizesScreenState extends State<SavedSheetSizesScreen> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // 👇 أيقونة العين - تعرض بيانات المقاس
                       IconButton(
                         icon: const Icon(Icons.remove_red_eye,
                             color: Colors.orange),
@@ -343,6 +389,7 @@ class _SavedSheetSizesScreenState extends State<SavedSheetSizesScreen> {
                             MaterialPageRoute(
                               builder: (_) => SheetSizeScreen(
                                 existingData: record,
+                                existingDataKey: key,
                               ),
                             ),
                           );
@@ -351,8 +398,7 @@ class _SavedSheetSizesScreenState extends State<SavedSheetSizesScreen> {
                       IconButton(
                         icon: const Icon(Icons.delete, color: Colors.red),
                         onPressed: () {
-                          savedSheetSizesBox
-                              .delete(filteredRecords[idx]['key']);
+                          savedSheetSizesBox.delete(key);
                         },
                       ),
                     ],

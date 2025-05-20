@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -6,11 +7,12 @@ import 'package:cartpress_smartsheet/drawers/app_drawer.dart';
 import 'package:camera/camera.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class InkReportScreen extends StatefulWidget {
-  final Map? initialData;
+  final Map<String, dynamic>? initialData;
 
   const InkReportScreen({super.key, this.initialData});
 
@@ -36,7 +38,7 @@ class _InkReportScreenState extends State<InkReportScreen> {
 
   // Camera
   CameraController? _cameraController;
-  late bool _isCameraReady = false;
+  bool _isCameraReady = false;
   final List<File> _capturedImages = [];
   bool _isProcessing = false;
 
@@ -45,10 +47,11 @@ class _InkReportScreenState extends State<InkReportScreen> {
     super.initState();
     _inkReportBox = Hive.box('inkReports');
     _initializeControllers();
-
     if (widget.initialData != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showInkReportDialog(context);
+        if (mounted) {
+          _showInkReportDialog(context);
+        }
       });
     }
   }
@@ -74,28 +77,58 @@ class _InkReportScreenState extends State<InkReportScreen> {
   }
 
   void _loadInitialData(Map<String, dynamic> data) {
-    setState(() {
-      dateController.text = data['date'] ?? '';
-      clientNameController.text = data['clientName'] ?? '';
-      productController.text = data['product'] ?? '';
-      productCodeController.text = data['productCode'] ?? '';
-      lengthController.text = data['dimensions']['length'].toString();
-      widthController.text = data['dimensions']['width'].toString();
-      heightController.text = data['dimensions']['height'].toString();
+    dateController.text = data['date'] ?? '';
+    clientNameController.text = data['clientName'] ?? '';
+    productController.text = data['product'] ?? '';
+    productCodeController.text = data['productCode'] ?? '';
 
-      // الصور إن وجدت
-      preloadedImagePaths = data['imagePaths'] is List
-          ? List<String>.from(data['imagePaths'])
-          : [];
+    if (data['dimensions'] is Map) {
+      lengthController.text = data['dimensions']['length']?.toString() ?? '';
+      widthController.text = data['dimensions']['width']?.toString() ?? '';
+      heightController.text = data['dimensions']['height']?.toString() ?? '';
+    } else {
+      lengthController.clear();
+      widthController.clear();
+      heightController.clear();
+    }
 
-      if (preloadedImagePaths != null && preloadedImagePaths!.isNotEmpty) {
-        _capturedImages.clear();
-        _capturedImages.addAll(preloadedImagePaths!.map((p) => File(p)));
-      }
-    });
+    quantityController.text = data['quantity'] ?? '';
+    notesController.text = data['notes'] ?? '';
+
+    colors.clear();
+    if (data.containsKey('colors') && data['colors'] is List) {
+      colors = (data['colors'] as List).map((color) {
+        return ColorField(
+          colorController: TextEditingController(text: color['color']),
+          quantityController: TextEditingController(text: color['quantity']),
+        );
+      }).toList();
+    }
+
+    preloadedImagePaths =
+        data['imagePaths'] is List ? List<String>.from(data['imagePaths']) : [];
+
+    _capturedImages.clear();
+    if (preloadedImagePaths != null && preloadedImagePaths!.isNotEmpty) {
+      _capturedImages.addAll(preloadedImagePaths!.map((p) => File(p)));
+    }
   }
 
-  Future<void> _initializeCamera() async {
+  Future<bool> _initializeCamera() async {
+    if (kIsWeb) {
+      setState(() => _isCameraReady = false);
+      return true; // السماح بالفتح بدون كاميرا على الويب
+    }
+
+    var status = await Permission.camera.request();
+    if (!status.isGranted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('يجب منح صلاحية الكاميرا')),
+      );
+      setState(() => _isCameraReady = false);
+      return false;
+    }
+
     try {
       final cameras = await availableCameras();
       final backCamera = cameras.firstWhere(
@@ -106,10 +139,16 @@ class _InkReportScreenState extends State<InkReportScreen> {
       _cameraController =
           CameraController(backCamera, quality, enableAudio: false);
       await _cameraController!.initialize();
-      if (!mounted) return;
+      if (!mounted) return false;
       setState(() => _isCameraReady = true);
+      return true;
     } catch (e) {
       debugPrint("Camera initialization error: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('خطأ في تهيئة الكاميرا: $e')),
+      );
+      setState(() => _isCameraReady = false);
+      return false;
     }
   }
 
@@ -121,7 +160,6 @@ class _InkReportScreenState extends State<InkReportScreen> {
         return ResolutionPreset.low;
       case 'high':
         return ResolutionPreset.high;
-      case 'medium':
       default:
         return ResolutionPreset.medium;
     }
@@ -206,7 +244,7 @@ class _InkReportScreenState extends State<InkReportScreen> {
     }
   }
 
-  void _saveInkReport({int? index}) {
+  void _saveInkReport({dynamic index}) {
     try {
       final record = {
         'date': dateController.text,
@@ -232,9 +270,9 @@ class _InkReportScreenState extends State<InkReportScreen> {
       };
 
       if (index == null) {
-        _inkReportBox.add(record);
+        _inkReportBox.add(record); // إضافة جديدة
       } else {
-        _inkReportBox.putAt(index, record);
+        _inkReportBox.put(index, record); // تعديل موجود
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -274,15 +312,24 @@ class _InkReportScreenState extends State<InkReportScreen> {
     clientNameController.text = existingData['clientName'] ?? '';
     productController.text = existingData['product'] ?? '';
     productCodeController.text = existingData['productCode'] ?? '';
-    lengthController.text =
-        _formatDecimal(existingData['dimensions']['length'] ?? '');
-    widthController.text =
-        _formatDecimal(existingData['dimensions']['width'] ?? '');
-    heightController.text =
-        _formatDecimal(existingData['dimensions']['height'] ?? '');
+
+    if (existingData['dimensions'] is Map) {
+      lengthController.text =
+          existingData['dimensions']['length']?.toString() ?? '';
+      widthController.text =
+          existingData['dimensions']['width']?.toString() ?? '';
+      heightController.text =
+          existingData['dimensions']['height']?.toString() ?? '';
+    } else {
+      lengthController.clear();
+      widthController.clear();
+      heightController.clear();
+    }
+
     quantityController.text = existingData['quantity'] ?? '';
     notesController.text = existingData['notes'] ?? '';
 
+    colors.clear();
     if (existingData.containsKey('colors') && existingData['colors'] is List) {
       colors = (existingData['colors'] as List).map((color) {
         return ColorField(
@@ -295,12 +342,19 @@ class _InkReportScreenState extends State<InkReportScreen> {
     preloadedImagePaths = existingData['imagePaths'] is List
         ? List<String>.from(existingData['imagePaths'])
         : [];
+
+    _capturedImages.clear();
+    if (preloadedImagePaths != null && preloadedImagePaths!.isNotEmpty) {
+      _capturedImages.addAll(preloadedImagePaths!.map((p) => File(p)));
+    }
   }
 
   void _showInkReportDialog(BuildContext context,
-      {int? index, Map<String, dynamic>? existingData}) {
+      {dynamic index, Map<String, dynamic>? existingData}) {
     if (existingData != null) {
       _prefillDataFromExisting(Map<String, dynamic>.from(existingData));
+    } else if (widget.initialData != null) {
+      _loadInitialData(Map<String, dynamic>.from(widget.initialData!));
     } else {
       dateController.text =
           "${DateTime.now().year}-${DateTime.now().month}-${DateTime.now().day}";
@@ -389,8 +443,6 @@ class _InkReportScreenState extends State<InkReportScreen> {
                         ),
                       ],
                     ),
-
-                    // الكاميرا ومعاينة الصور
                     if (_isCameraReady && _cameraController != null)
                       Column(
                         children: [
@@ -403,45 +455,50 @@ class _InkReportScreenState extends State<InkReportScreen> {
                             icon: const Icon(Icons.camera),
                             label: const Text("التقط صورة"),
                           ),
+                          if (_capturedImages.isNotEmpty)
+                            SizedBox(
+                              height: 100,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: _capturedImages.length,
+                                itemBuilder: (context, imgIndex) {
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 4.0),
+                                    child: Stack(
+                                      alignment: Alignment.topRight,
+                                      children: [
+                                        GestureDetector(
+                                          onTap: () => _showFullScreenImageList(
+                                            _capturedImages
+                                                .map((f) => f.path)
+                                                .toList(),
+                                            imgIndex,
+                                          ),
+                                          child: Image.file(
+                                            _capturedImages[imgIndex],
+                                            width: 80,
+                                            height: 80,
+                                            fit: BoxFit.cover,
+                                          ),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.close,
+                                              size: 18, color: Colors.red),
+                                          onPressed: () {
+                                            setStateDialog(() {
+                                              _removeImage(imgIndex);
+                                            });
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
                         ],
                       ),
-
-                    if (_capturedImages.isNotEmpty)
-                      SizedBox(
-                        height: 100,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _capturedImages.length,
-                          itemBuilder: (context, imgIndex) {
-                            return Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 4.0),
-                              child: Stack(
-                                alignment: Alignment.topRight,
-                                children: [
-                                  Image.file(
-                                    _capturedImages[imgIndex],
-                                    width: 80,
-                                    height: 80,
-                                    fit: BoxFit.cover,
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.close,
-                                        size: 18, color: Colors.red),
-                                    onPressed: () {
-                                      setStateDialog(() {
-                                        _removeImage(imgIndex);
-                                      });
-                                    },
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-
-                    // ألوان الأحبار
                     ...colors.asMap().entries.map((entry) {
                       final idx = entry.key;
                       final colorField = entry.value;
@@ -485,13 +542,11 @@ class _InkReportScreenState extends State<InkReportScreen> {
                         ),
                       );
                     }),
-
                     ElevatedButton.icon(
                       onPressed: () => _addColorField(setStateDialog),
                       icon: const Icon(Icons.add),
                       label: const Text("إضافة لون"),
                     ),
-
                     TextField(
                       controller: quantityController,
                       keyboardType: TextInputType.number,
@@ -527,11 +582,12 @@ class _InkReportScreenState extends State<InkReportScreen> {
     );
   }
 
-  void _deleteInkReport(int index) {
-    _inkReportBox.deleteAt(index);
+  void _deleteInkReport(dynamic key) {
+    _inkReportBox.delete(key);
   }
 
-  void _showFullScreenImage(String imagePath) {
+  // تعديل: عرض كل الصور مع التمرير بينهم، يبدأ من الصورة المختارة
+  void _showFullScreenImageList(List<String> imagePaths, int initialIndex) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -541,12 +597,18 @@ class _InkReportScreenState extends State<InkReportScreen> {
         child: Stack(
           alignment: Alignment.topRight,
           children: [
-            Center(
-              child: PhotoView(
-                imageProvider: FileImage(File(imagePath)),
-                minScale: PhotoViewComputedScale.contained * 0.8,
-                maxScale: PhotoViewComputedScale.covered * 2.5,
-              ),
+            PageView.builder(
+              controller: PageController(initialPage: initialIndex),
+              itemCount: imagePaths.length,
+              itemBuilder: (context, index) {
+                return Center(
+                  child: PhotoView(
+                    imageProvider: FileImage(File(imagePaths[index])),
+                    minScale: PhotoViewComputedScale.contained * 0.8,
+                    maxScale: PhotoViewComputedScale.covered * 2.5,
+                  ),
+                );
+              },
             ),
             Padding(
               padding: const EdgeInsets.all(16.0),
@@ -628,14 +690,14 @@ class _InkReportScreenState extends State<InkReportScreen> {
             return const Center(child: Text("🚫 لا يوجد تقارير حبر بعد"));
           }
 
-          final filteredRecords = box.values.where((record) {
-            final recordMap = record as Map;
+          final filteredRecordsWithKey = box.toMap().entries.where((entry) {
+            final record = entry.value as Map;
             final clientName =
-                recordMap['clientName']?.toString().toLowerCase() ?? "";
+                record['clientName']?.toString().toLowerCase() ?? "";
             final productCode =
-                recordMap['productCode']?.toString().toLowerCase() ?? "";
+                record['productCode']?.toString().toLowerCase() ?? "";
             final productName =
-                recordMap['product']?.toString().toLowerCase() ?? "";
+                record['product']?.toString().toLowerCase() ?? "";
             final query = searchQuery.toLowerCase();
 
             if (searchQuery.isNotEmpty) {
@@ -650,24 +712,27 @@ class _InkReportScreenState extends State<InkReportScreen> {
             return true;
           }).toList()
             ..sort((a, b) {
-              final dateA = a['date'] ?? '';
-              final dateB = b['date'] ?? '';
+              final dateA = a.value['date'] ?? '';
+              final dateB = b.value['date'] ?? '';
               final timeA = DateTime.tryParse(dateA);
               final timeB = DateTime.tryParse(dateB);
               if (timeA != null && timeB != null) {
                 return timeB.compareTo(timeA); // الأحدث أولًا
               }
-              return b['date'].compareTo(a['date']);
+              return b.value['date'].compareTo(a.value['date']);
             });
 
-          if (filteredRecords.isEmpty) {
+          if (filteredRecordsWithKey.isEmpty) {
             return const Center(child: Text("🚫 لا توجد نتائج للبحث."));
           }
 
           return ListView.builder(
-            itemCount: filteredRecords.length,
+            itemCount: filteredRecordsWithKey.length,
             itemBuilder: (context, idx) {
-              final record = Map<String, dynamic>.from(filteredRecords[idx]);
+              final entry = filteredRecordsWithKey[idx];
+              final key = entry.key;
+              final record = Map<String, dynamic>.from(entry.value);
+
               final List<String> imagePaths = record['imagePaths'] is List
                   ? List<String>.from(record['imagePaths'])
                   : [];
@@ -719,8 +784,8 @@ class _InkReportScreenState extends State<InkReportScreen> {
                                       }
                                       if (snapshot.hasData && snapshot.data!) {
                                         return GestureDetector(
-                                          onTap: () =>
-                                              _showFullScreenImage(imagePath),
+                                          onTap: () => _showFullScreenImageList(
+                                              imagePaths, imgIndex),
                                           child: Image.file(
                                             File(imagePath),
                                             width: 50,
@@ -746,14 +811,27 @@ class _InkReportScreenState extends State<InkReportScreen> {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.edit, color: Colors.blue),
-                        onPressed: () {
+                        onPressed: () async {
                           _prefillDataFromExisting(record);
-                          _showInkReportDialog(context, existingData: record);
+                          if (!kIsWeb) {
+                            showDialog(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (context) => const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                            );
+                            await _initializeCamera();
+                            if (Navigator.canPop(context))
+                              Navigator.pop(context);
+                          }
+                          _showInkReportDialog(context,
+                              index: key, existingData: record);
                         },
                       ),
                       IconButton(
                         icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => _deleteInkReport(idx),
+                        onPressed: () => _deleteInkReport(key),
                       ),
                     ],
                   ),
@@ -764,7 +842,24 @@ class _InkReportScreenState extends State<InkReportScreen> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showInkReportDialog(context),
+        onPressed: () async {
+          if (kIsWeb) {
+            _showInkReportDialog(context);
+            return;
+          }
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => const Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
+          final cameraReady = await _initializeCamera();
+          if (Navigator.canPop(context)) Navigator.pop(context);
+          if (cameraReady) {
+            _showInkReportDialog(context);
+          }
+        },
         child: const Icon(Icons.add),
       ),
     );

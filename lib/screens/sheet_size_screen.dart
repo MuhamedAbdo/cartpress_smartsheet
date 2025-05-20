@@ -12,9 +12,9 @@ import 'package:cartpress_smartsheet/theme_provider.dart';
 
 class SheetSizeScreen extends StatefulWidget {
   final Map? existingData;
-  final int? existingDataIndex;
+  final dynamic existingDataKey; // <-- استقبل الـ key وليس الـ index
 
-  const SheetSizeScreen({super.key, this.existingData, this.existingDataIndex});
+  const SheetSizeScreen({super.key, this.existingData, this.existingDataKey});
 
   @override
   _SheetSizeScreenState createState() => _SheetSizeScreenState();
@@ -30,12 +30,11 @@ class _SheetSizeScreenState extends State<SheetSizeScreen> {
 
   final Box savedSheetSizesBox = Hive.box('savedSheetSizes');
 
-  late CameraController? _cameraController;
-  late bool _isCameraReady = false;
+  CameraController? _cameraController;
+  bool _isCameraReady = false;
   List<File> _capturedImages = [];
   bool _isProcessing = false;
 
-  // Existing state variables
   bool isOverFlap = false;
   bool isFlap = true;
   bool isOneFlap = false;
@@ -88,8 +87,12 @@ class _SheetSizeScreenState extends State<SheetSizeScreen> {
     widthController.text = data['width']?.toString() ?? '';
     heightController.text = data['height']?.toString() ?? '';
     result = data['result']?.toString() ?? '';
-    sheetLengthResult = data['result']?.split("\n")[0] ?? '';
-    sheetWidthResult = data['result']?.split("\n")[1] ?? '';
+
+    // الحل الآمن للتقسيم
+    final resultLines = result.split('\n');
+    sheetLengthResult = resultLines.isNotEmpty ? resultLines[0] : '';
+    sheetWidthResult = resultLines.length > 1 ? resultLines[1] : '';
+
     productionWidth1 = data['productionWidth1']?.toString() ?? '';
     productionWidth2 = data['productionWidth2']?.toString() ?? '';
     productionHeight = data['productionHeight']?.toString() ?? '';
@@ -187,25 +190,37 @@ class _SheetSizeScreenState extends State<SheetSizeScreen> {
       'isQuarterSize': isQuarterSize,
       'isQuarterWidth': isQuarterWidth,
       'imagePaths': _capturedImages.map((file) => file.path).toList(),
+      'date': DateTime.now().toIso8601String(),
     };
 
-    bool isDuplicate = false;
-    int duplicateIndex = -1;
+    // تعديل: إذا كان هناك key، استخدم put(key, ...) مباشرة
+    if (widget.existingDataKey != null) {
+      savedSheetSizesBox.put(widget.existingDataKey, newRecord);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("تم تحديث المقاس بنجاح!")),
+      );
+      Navigator.pop(context);
+      return;
+    }
 
-    for (int i = 0; i < savedSheetSizesBox.length; i++) {
-      final existingRecord = savedSheetSizesBox.getAt(i) as Map;
+    // في حالة الإضافة الجديدة، تحقق من التكرار
+    bool isDuplicate = false;
+    dynamic duplicateKey;
+
+    for (final key in savedSheetSizesBox.keys) {
+      final existingRecord = savedSheetSizesBox.get(key) as Map;
       if (existingRecord['clientName'] == newRecord['clientName'] &&
           existingRecord['productCode'] == newRecord['productCode']) {
         if (isQuarterSize) {
           if (existingRecord['isQuarterSize'] == true &&
               existingRecord['isQuarterWidth'] == isQuarterWidth) {
             isDuplicate = true;
-            duplicateIndex = i;
+            duplicateKey = key;
             break;
           }
         } else {
           isDuplicate = true;
-          duplicateIndex = i;
+          duplicateKey = key;
           break;
         }
       }
@@ -224,7 +239,7 @@ class _SheetSizeScreenState extends State<SheetSizeScreen> {
             ),
             TextButton(
               onPressed: () {
-                savedSheetSizesBox.putAt(duplicateIndex, newRecord);
+                savedSheetSizesBox.put(duplicateKey, newRecord);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text("تم تحديث المقاس بنجاح!")),
                 );
@@ -326,7 +341,7 @@ class _SheetSizeScreenState extends State<SheetSizeScreen> {
   Widget build(BuildContext context) {
     Provider.of<ThemeProvider>(context);
     return Scaffold(
-      drawer: const AppDrawer(), // ✅ تم الإضافة هنا
+      drawer: const AppDrawer(),
       appBar: AppBar(
         centerTitle: true,
         title: const Text("مقاس الشيت"),
@@ -481,7 +496,9 @@ class _SheetSizeScreenState extends State<SheetSizeScreen> {
   Widget _buildCameraPreview() {
     return Column(
       children: [
-        if (_isCameraReady && _cameraController!.value.isInitialized)
+        if (_isCameraReady &&
+            _cameraController != null &&
+            _cameraController!.value.isInitialized)
           SizedBox(
             height: 200,
             child: CameraPreview(_cameraController!),
