@@ -30,6 +30,8 @@ void main() async {
   await Hive.openBox('maintenanceRecords');
   await Hive.openBox('savedSheetSizes');
   await Hive.openBox('serialSetupState');
+  await Hive.openBox('flexo_maintenance');
+  await Hive.openBox('production_maintenance');
 
   runApp(const CartpressSmartSheet());
 }

@@ -1,4 +1,5 @@
 import 'package:cartpress_smartsheet/drawers/app_drawer.dart';
+import 'package:cartpress_smartsheet/widgets/maintenance_section.dart';
 import 'package:flutter/material.dart';
 import 'serial_setup_screen.dart';
 import 'ink_report_screen.dart';
@@ -76,7 +77,10 @@ class FlexoScreen extends StatelessWidget {
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const MaintenanceScreen(),
+                  builder: (context) => const MaintenanceSection(
+                    boxName: 'flexo_maintenance',
+                    title: "🛠 صيانة الفلكسو",
+                  ),
                 ),
               ),
               style: ElevatedButton.styleFrom(
@@ -85,7 +89,12 @@ class FlexoScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              child: const Text("الصيانة", style: TextStyle(fontSize: 20)),
+              child: const Text(
+                "الصيانة",
+                style: TextStyle(
+                  fontSize: 20,
+                ),
+              ),
             ),
             const SizedBox(height: 10),
             ElevatedButton(

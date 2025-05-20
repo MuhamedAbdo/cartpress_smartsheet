@@ -1,3 +1,5 @@
+import 'package:cartpress_smartsheet/screens/maintenance_screen.dart';
+import 'package:cartpress_smartsheet/widgets/maintenance_section.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cartpress_smartsheet/drawers/app_drawer.dart';
@@ -55,6 +57,30 @@ class ProductionLineScreen extends StatelessWidget {
                 ),
               ),
               child: const Text("عدد الشيتات", style: TextStyle(fontSize: 20)),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const MaintenanceSection(
+                    boxName: 'production_maintenance',
+                    title: "🛠 صيانة خط الإنتاج",
+                  ),
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(200, 60),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                "الصيانة",
+                style: TextStyle(
+                  fontSize: 20,
+                ),
+              ),
             ),
             const SizedBox(height: 10),
             ElevatedButton(
