@@ -1,4 +1,5 @@
 import 'package:cartpress_smartsheet/screens/maintenance_screen.dart';
+import 'package:cartpress_smartsheet/screens/workers_screen.dart';
 import 'package:cartpress_smartsheet/widgets/maintenance_section.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -113,6 +114,30 @@ class ProductionLineScreen extends StatelessWidget {
               ),
               child: const Text("المقاسات المحفوظة",
                   style: TextStyle(fontSize: 20)),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const WorkersScreen(
+                    departmentBoxName: 'production_workers',
+                    departmentTitle: "خط الإنتاج",
+                  ),
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(200, 60),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                "👷‍♂️ طاقم العمل",
+                style: TextStyle(
+                  fontSize: 20,
+                ),
+              ),
             ),
           ],
         ),

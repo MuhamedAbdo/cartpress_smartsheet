@@ -1,10 +1,13 @@
 import 'package:cartpress_smartsheet/screens/about_screen.dart';
-import 'package:cartpress_smartsheet/screens/settings_screen.dart'; // ⬅️ إضافة شاشة الإعدادات
-import 'package:cartpress_smartsheet/screens/camera_quality_settings_screen.dart'; // ⬅️ إضافة إعدادات جودة الكاميرا
-
+import 'package:cartpress_smartsheet/screens/camera_quality_settings_screen.dart';
+import 'package:cartpress_smartsheet/screens/settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
+
+// Models
+import 'models/worker_model.dart';
+import 'models/worker_action_model.dart';
 
 // Screens
 import 'screens/home_screen.dart';
@@ -24,14 +27,32 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Hive.initFlutter();
+
+  // افتح الصناديق المطلوبة أولًا
+  await Hive.openBox<WorkerAction>('worker_actions'); // ← مهم جدًا
+
+  // سجل الـ Adapters أولًا
+  if (!Hive.isAdapterRegistered(1)) {
+    Hive.registerAdapter(WorkerAdapter());
+  }
+
+  if (!Hive.isAdapterRegistered(2)) {
+    Hive.registerAdapter(WorkerActionAdapter());
+  }
+
+  // افتح صناديق البيانات الأساسية
   await Hive.openBox('settings');
   await Hive.openBox('inkReports');
   await Hive.openBox('storeEntries');
   await Hive.openBox('maintenanceRecords');
   await Hive.openBox('savedSheetSizes');
   await Hive.openBox('serialSetupState');
-  await Hive.openBox('flexo_maintenance');
-  await Hive.openBox('production_maintenance');
+
+  // افتح صناديق العمال
+  await Hive.openBox<Worker>('production_workers');
+  await Hive.openBox<Worker>('flexo_workers');
+  await Hive.openBox<Worker>('store_workers');
+  await Hive.openBox<WorkerAction>('worker_actions');
 
   runApp(const CartpressSmartSheet());
 }
@@ -69,10 +90,9 @@ class AppRouter extends StatelessWidget {
         '/serialSetup': (_) => const SerialSetupScreen(),
         '/calculator': (_) => const CalculatorScreen(),
         '/about': (_) => const AboutScreen(),
-        SettingsScreen.routeName: (_) =>
-            const SettingsScreen(), // ⬅️ إضافة الإعدادات
+        SettingsScreen.routeName: (_) => const SettingsScreen(),
         CameraQualitySettingsScreen.routeName: (_) =>
-            const CameraQualitySettingsScreen(), // ⬅️ إضافة إعدادات الكاميرا
+            const CameraQualitySettingsScreen(),
       },
     );
   }

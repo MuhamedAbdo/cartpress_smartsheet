@@ -1,4 +1,5 @@
 import 'package:cartpress_smartsheet/drawers/app_drawer.dart';
+import 'package:cartpress_smartsheet/screens/workers_screen.dart';
 import 'package:cartpress_smartsheet/widgets/maintenance_section.dart';
 import 'package:flutter/material.dart';
 import 'serial_setup_screen.dart';
@@ -111,6 +112,30 @@ class FlexoScreen extends StatelessWidget {
               ),
               child:
                   const Text("الآلة الحاسبة", style: TextStyle(fontSize: 20)),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const WorkersScreen(
+                    departmentBoxName: 'flexo_workers',
+                    departmentTitle: "الفلكسو",
+                  ),
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(200, 60),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text(
+                "👷‍♂️ طاقم الفنيين",
+                style: TextStyle(
+                  fontSize: 20,
+                ),
+              ),
             ),
           ],
         ),
