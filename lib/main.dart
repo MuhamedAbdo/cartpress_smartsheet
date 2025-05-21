@@ -19,6 +19,7 @@ import 'screens/sheet_size_screen.dart';
 import 'screens/saved_sheet_sizes_screen.dart';
 import 'screens/serial_setup_screen.dart';
 import 'screens/calculator_screen.dart';
+import 'screens/workers_screen.dart'; // تأكد من إضافة هذا الاستيراد
 
 // Providers
 import 'theme_provider.dart';
@@ -26,33 +27,33 @@ import 'theme_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Hive.initFlutter();
+  // تهيئة Hive مع معالجة الأخطاء
+  try {
+    await Hive.initFlutter();
 
-  // افتح الصناديق المطلوبة أولًا
-  await Hive.openBox<WorkerAction>('worker_actions'); // ← مهم جدًا
-
-  // سجل الـ Adapters أولًا
-  if (!Hive.isAdapterRegistered(1)) {
+    // تسجيل Adapters
     Hive.registerAdapter(WorkerAdapter());
-  }
-
-  if (!Hive.isAdapterRegistered(2)) {
     Hive.registerAdapter(WorkerActionAdapter());
+
+    // فتح جميع الصناديق مع التحقق من الأخطاء
+    await Future.wait([
+      Hive.openBox('settings'),
+      Hive.openBox('inkReports'),
+      Hive.openBox('storeEntries'),
+      Hive.openBox('maintenanceRecords'),
+      Hive.openBox('savedSheetSizes'),
+      Hive.openBox('serialSetupState'),
+      Hive.openBox<Worker>('workers_section_production'),
+      Hive.openBox<Worker>('workers_section_flexo'),
+      Hive.openBox<Worker>('workers_section_store'),
+      Hive.openBox<WorkerAction>('worker_actions'),
+    ]);
+
+    print('تم فتح جميع صناديق Hive بنجاح');
+  } catch (e) {
+    print('حدث خطأ أثناء تهيئة Hive: $e');
+    // يمكنك إضافة إجراءات إضافية هنا مثل إعادة المحاولة
   }
-
-  // افتح صناديق البيانات الأساسية
-  await Hive.openBox('settings');
-  await Hive.openBox('inkReports');
-  await Hive.openBox('storeEntries');
-  await Hive.openBox('maintenanceRecords');
-  await Hive.openBox('savedSheetSizes');
-  await Hive.openBox('serialSetupState');
-
-  // افتح صناديق العمال
-  await Hive.openBox<Worker>('production_workers');
-  await Hive.openBox<Worker>('flexo_workers');
-  await Hive.openBox<Worker>('store_workers');
-  await Hive.openBox<WorkerAction>('worker_actions');
 
   runApp(const CartpressSmartSheet());
 }
@@ -90,6 +91,11 @@ class AppRouter extends StatelessWidget {
         '/serialSetup': (_) => const SerialSetupScreen(),
         '/calculator': (_) => const CalculatorScreen(),
         '/about': (_) => const AboutScreen(),
+        '/workers': (_) => const WorkersScreen(
+              // أضف هذا المسار
+              departmentBoxName: 'workers_section_production',
+              departmentTitle: 'الإنتاج',
+            ),
         SettingsScreen.routeName: (_) => const SettingsScreen(),
         CameraQualitySettingsScreen.routeName: (_) =>
             const CameraQualitySettingsScreen(),

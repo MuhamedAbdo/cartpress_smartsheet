@@ -131,7 +131,7 @@ class FlexoScreen extends StatelessWidget {
                 ),
               ),
               child: const Text(
-                "👷‍♂️ طاقم الفنيين",
+                "👷‍♂️ طاقم العمل",
                 style: TextStyle(
                   fontSize: 20,
                 ),

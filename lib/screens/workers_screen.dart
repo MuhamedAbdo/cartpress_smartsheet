@@ -1,11 +1,10 @@
-import 'package:cartpress_smartsheet/drawers/app_drawer.dart';
-import 'package:cartpress_smartsheet/models/worker_action_model.dart';
-import 'package:cartpress_smartsheet/screens/worker_details_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:cartpress_smartsheet/models/worker_model.dart';
+import 'package:cartpress_smartsheet/models/worker_action_model.dart';
+import 'package:cartpress_smartsheet/screens/worker_details_screen.dart';
 
-class WorkersScreen extends StatelessWidget {
+class WorkersScreen extends StatefulWidget {
   final String departmentBoxName;
   final String departmentTitle;
 
@@ -16,17 +15,59 @@ class WorkersScreen extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  State<WorkersScreen> createState() => _WorkersScreenState();
+}
+
+class _WorkersScreenState extends State<WorkersScreen> {
+  late Box<Worker> workerBox;
+  bool isLoading = true;
+  String? errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeBox();
+  }
+
+  Future<void> _initializeBox() async {
+    try {
+      if (!Hive.isBoxOpen(widget.departmentBoxName)) {
+        await Hive.openBox<Worker>(widget.departmentBoxName);
+      }
+      workerBox = Hive.box<Worker>(widget.departmentBoxName);
+      setState(() {
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        errorMessage = 'فشل في تحميل بيانات العمال: ${e.toString()}';
+        isLoading = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (errorMessage != null) {
+      return Scaffold(
+        appBar: AppBar(title: Text(widget.departmentTitle)),
+        body: Center(child: Text(errorMessage!)),
+      );
+    }
+
     return Scaffold(
-      drawer: const AppDrawer(), // ✅ تم الإضافة هنا
       appBar: AppBar(
+        title: Text("👷‍♂️ ${widget.departmentTitle} - العمال"),
         centerTitle: true,
-        title: Text(
-          "👷‍♂️ $departmentTitle - العمال",
-        ),
       ),
       body: ValueListenableBuilder<Box<Worker>>(
-        valueListenable: Hive.box<Worker>(departmentBoxName).listenable(),
+        valueListenable: workerBox.listenable(),
         builder: (context, box, _) {
           if (box.isEmpty) {
             return const Center(child: Text("🚫 لا يوجد عمال بعد"));
@@ -36,7 +77,6 @@ class WorkersScreen extends StatelessWidget {
             itemCount: box.length,
             itemBuilder: (context, index) {
               final worker = box.getAt(index)!;
-
               return Card(
                 margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                 child: ListTile(
@@ -48,9 +88,25 @@ class WorkersScreen extends StatelessWidget {
                       Text("🛠 ${worker.job}"),
                     ],
                   ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.add, color: Colors.green),
-                    onPressed: () => _showWorkerActionsDialog(context, worker),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.add, color: Colors.green),
+                        onPressed: () =>
+                            _showWorkerActionsDialog(context, worker),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.edit, color: Colors.blue),
+                        onPressed: () => _showAddWorkerDialog(
+                            context, widget.departmentBoxName,
+                            existingWorker: worker),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () => box.deleteAt(index),
+                      ),
+                    ],
                   ),
                   onTap: () => _showWorkerDetails(context, worker),
                 ),
@@ -60,43 +116,53 @@ class WorkersScreen extends StatelessWidget {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddWorkerDialog(context, departmentBoxName),
+        onPressed: () =>
+            _showAddWorkerDialog(context, widget.departmentBoxName),
         child: const Icon(Icons.add),
       ),
     );
   }
 
-  void _showAddWorkerDialog(BuildContext context, String boxName) {
-    final nameController = TextEditingController();
-    final phoneController = TextEditingController();
-    String job = 'فني';
+  void _showAddWorkerDialog(
+    BuildContext context,
+    String boxName, {
+    Worker? existingWorker,
+  }) {
+    final nameController =
+        TextEditingController(text: existingWorker?.name ?? '');
+    final phoneController =
+        TextEditingController(text: existingWorker?.phone ?? '');
+    String job = existingWorker?.job ?? 'مشرف';
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text("➕ إضافة عامل جديد"),
+          title: Text(
+              existingWorker == null ? "➕ إضافة عامل جديد" : "🔄 تعديل العامل"),
           content: SingleChildScrollView(
             child: Column(
               children: [
                 TextField(
-                    controller: nameController,
-                    decoration: const InputDecoration(labelText: "👤 الإسم")),
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: "👤 الإسم"),
+                ),
                 TextField(
-                    controller: phoneController,
-                    keyboardType: TextInputType.phone,
-                    decoration:
-                        const InputDecoration(labelText: "📞 رقم الهاتف")),
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(labelText: "📞 رقم الهاتف"),
+                ),
                 DropdownButtonFormField<String>(
                   value: job,
                   items: const [
                     DropdownMenuItem(
                         value: 'رئيس القسم', child: Text('رئيس القسم')),
+                    DropdownMenuItem(value: 'مشرف', child: Text('مشرف')),
                     DropdownMenuItem(value: 'فني', child: Text('فني')),
                     DropdownMenuItem(value: 'عامل', child: Text('عامل')),
                     DropdownMenuItem(value: 'مساعد', child: Text('مساعد')),
                   ],
-                  onChanged: (val) => setState(() => job = val ?? 'فني'),
+                  onChanged: (val) => setState(() => job = val ?? 'مشرف'),
                   decoration: const InputDecoration(labelText: "🛠 الوظيفة"),
                 ),
               ],
@@ -104,21 +170,28 @@ class WorkersScreen extends StatelessWidget {
           ),
           actions: [
             TextButton(
-                onPressed: Navigator.of(context).pop,
-                child: const Text("❌ إلغاء")),
+              onPressed: Navigator.of(context).pop,
+              child: const Text("❌ إلغاء"),
+            ),
             ElevatedButton(
               onPressed: () {
-                if (nameController.text.isNotEmpty &&
-                    phoneController.text.isNotEmpty) {
-                  final newWorker = Worker(
-                    name: nameController.text,
-                    phone: phoneController.text,
-                    job: job,
-                    actions: [],
-                  );
-                  Hive.box<Worker>(boxName).add(newWorker);
-                  Navigator.pop(context);
+                final newWorker = Worker(
+                  name: nameController.text,
+                  phone: phoneController.text,
+                  job: job,
+                  actions: existingWorker?.actions ?? [],
+                );
+
+                if (existingWorker == null) {
+                  workerBox.add(newWorker);
+                } else {
+                  existingWorker.name = nameController.text;
+                  existingWorker.phone = phoneController.text;
+                  existingWorker.job = job;
+                  existingWorker.save();
                 }
+
+                Navigator.pop(context);
               },
               child: const Text("💾 حفظ"),
             ),
@@ -132,20 +205,22 @@ class WorkersScreen extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            WorkerDetailsScreen(worker: worker, boxName: departmentBoxName),
+        builder: (_) => WorkerDetailsScreen(
+          worker: worker,
+          boxName: widget.departmentBoxName,
+        ),
       ),
     );
   }
 
-  void _showWorkerActionsDialog(BuildContext context, Worker worker) {
-    final actionController = TextEditingController();
+  Future<void> _showWorkerActionsDialog(
+      BuildContext context, Worker worker) async {
     final dayController = TextEditingController(text: '1');
     final noteController = TextEditingController();
-
+    final startDateController = TextEditingController();
+    DateTime? selectedStartDate;
+    DateTime? selectedReturnDate;
     String actionType = 'إجازة';
-    late DateTime selectedDate;
-    bool isDatePickerEnabled = true;
 
     showDialog(
       context: context,
@@ -173,12 +248,14 @@ class WorkersScreen extends StatelessWidget {
                     Expanded(
                       flex: 2,
                       child: DropdownButtonFormField<double>(
-                        value: 1.0,
+                        value: double.tryParse(dayController.text) ?? 1.0,
                         items: const [
                           DropdownMenuItem(value: 0.25, child: Text("¼ يوم")),
                           DropdownMenuItem(value: 0.5, child: Text("½ يوم")),
-                          DropdownMenuItem(value: 1.0, child: Text("يوم كامل")),
+                          DropdownMenuItem(value: 1.0, child: Text("يوم واحد")),
                           DropdownMenuItem(value: 2.0, child: Text("يومين")),
+                          DropdownMenuItem(value: 3.0, child: Text("3 أيام")),
+                          DropdownMenuItem(value: 7.0, child: Text("أسبوع")),
                         ],
                         onChanged: (val) =>
                             setState(() => dayController.text = val.toString()),
@@ -190,10 +267,10 @@ class WorkersScreen extends StatelessWidget {
                     Expanded(
                       flex: 3,
                       child: TextField(
-                        controller: actionController,
+                        controller: startDateController,
                         readOnly: true,
                         decoration:
-                            const InputDecoration(labelText: "📆 التاريخ"),
+                            const InputDecoration(labelText: "📅 تاريخ البدء"),
                         onTap: () async {
                           final pickedDate = await showDatePicker(
                             context: context,
@@ -202,52 +279,89 @@ class WorkersScreen extends StatelessWidget {
                             lastDate: DateTime(2100),
                           );
                           if (pickedDate != null) {
-                            selectedDate = pickedDate;
-                            actionController.text =
-                                "${selectedDate.year}-${selectedDate.month}-${selectedDate.day}";
-                            isDatePickerEnabled = false;
-                            setState(() {});
+                            setState(() {
+                              selectedStartDate = pickedDate;
+                              startDateController.text =
+                                  "${pickedDate.year}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.day.toString().padLeft(2, '0')}";
+                            });
                           }
                         },
                       ),
                     ),
                   ],
                 ),
+                if (actionType == 'إجازة')
+                  TextField(
+                    controller: TextEditingController(
+                      text: selectedReturnDate != null
+                          ? _formatDate(selectedReturnDate!)
+                          : '',
+                    ),
+                    readOnly: true,
+                    decoration:
+                        const InputDecoration(labelText: "🗓️ تاريخ العودة"),
+                    onTap: () async {
+                      if (selectedStartDate == null) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text("❌ اختر تاريخ البدء أولًا")));
+                        return;
+                      }
+
+                      final pickedDate = await showDatePicker(
+                        context: context,
+                        initialDate: selectedStartDate!,
+                        firstDate: selectedStartDate!,
+                        lastDate: DateTime(2100),
+                      );
+
+                      if (pickedDate != null) {
+                        setState(() {
+                          selectedReturnDate = pickedDate;
+                        });
+                      }
+                    },
+                  ),
                 TextField(
-                    controller: noteController,
-                    maxLines: 2,
-                    decoration: const InputDecoration(labelText: "📝 ملاحظات")),
+                  controller: noteController,
+                  maxLines: 2,
+                  decoration: const InputDecoration(labelText: "📝 ملاحظات"),
+                ),
               ],
             ),
           ),
           actions: [
             TextButton(
-                onPressed: Navigator.of(context).pop,
-                child: const Text("❌ إلغاء")),
+              onPressed: Navigator.of(context).pop,
+              child: const Text("❌ إلغاء"),
+            ),
             ElevatedButton(
-              onPressed: () {
-                final newAction = WorkerAction(
-                  type: actionType,
-                  days: double.tryParse(dayController.text) ?? 1.0,
-                  date: selectedDate,
-                  notes: noteController.text,
-                );
+              onPressed: () async {
+                if (selectedStartDate == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                      content: Text("❌ اختر تاريخ البدء أولًا")));
+                  return;
+                }
 
-                // ✅ استخدم الصندوق اللي مفتوح
-                final actionBox = Hive.box<WorkerAction>('worker_actions');
+                try {
+                  final actionBox = Hive.box<WorkerAction>('worker_actions');
+                  final newAction = WorkerAction(
+                    type: actionType,
+                    days: double.tryParse(dayController.text) ?? 1.0,
+                    date: selectedStartDate!,
+                    returnDate: selectedReturnDate,
+                    notes: noteController.text,
+                  );
 
-// ✅ أضف الإجراء وخذ الـ key
-                final key = actionBox.add(newAction); // ← هيرجع المفتاح
+                  actionBox.add(newAction);
+                  worker.actions.add(newAction);
+                  worker.save();
 
-// ✅ أضف الإجراء إلى العامل
-                worker.actions.add(newAction);
-                worker.save(); // ← أو worker.actions.put(key, newAction)
-
-                // ✅ أضف الإجراء إلى العامل باستخدام الصندوق
-                worker.actions.add(newAction);
-                worker.save(); // ← أو worker.actions.put() لو محتاج تعديل مباشر
-
-                Navigator.pop(context);
+                  Navigator.pop(context);
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text("❌ خطأ في حفظ الإجراء: ${e.toString()}")));
+                }
               },
               child: const Text("✅ حفظ الإجراء"),
             ),
@@ -255,5 +369,9 @@ class WorkersScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatDate(DateTime date) {
+    return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
   }
 }

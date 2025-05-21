@@ -5,27 +5,26 @@ part 'worker_model.g.dart';
 
 @HiveType(typeId: 1)
 class Worker extends HiveObject {
-  @HiveField(0)
-  final String name;
-
-  @HiveField(1)
-  final String phone;
-
-  @HiveField(2)
-  final String job;
+  late String name;
+  late String phone;
+  late String job;
 
   @HiveField(3)
   late HiveList<WorkerAction> actions;
 
   Worker({
-    required this.name,
-    required this.phone,
-    required this.job,
+    String? name,
+    String? phone,
+    String? job,
     List<WorkerAction>? actions,
-  }) {
+  }) : super() {
+    this.name = name ?? '';
+    this.phone = phone ?? '';
+    this.job = job ?? '';
+
     if (actions != null) {
-      this.actions =
-          HiveList(Hive.box<WorkerAction>('worker_actions'), objects: actions);
+      var box = Hive.box<WorkerAction>('worker_actions');
+      this.actions = HiveList(box)..addAll(actions);
     } else {
       this.actions = HiveList(Hive.box<WorkerAction>('worker_actions'));
     }
