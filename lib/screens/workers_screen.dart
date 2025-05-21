@@ -1,3 +1,4 @@
+import 'package:cartpress_smartsheet/drawers/app_drawer.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:cartpress_smartsheet/models/worker_model.dart';
@@ -56,12 +57,19 @@ class _WorkersScreenState extends State<WorkersScreen> {
 
     if (errorMessage != null) {
       return Scaffold(
-        appBar: AppBar(title: Text(widget.departmentTitle)),
+        drawer: const AppDrawer(),
+        appBar: AppBar(
+          centerTitle: true,
+          title: Text(
+            widget.departmentTitle,
+          ),
+        ),
         body: Center(child: Text(errorMessage!)),
       );
     }
 
     return Scaffold(
+      drawer: const AppDrawer(),
       appBar: AppBar(
         title: Text("👷‍♂️ ${widget.departmentTitle} - العمال"),
         centerTitle: true,

@@ -519,8 +519,9 @@ class _InkReportScreenState extends State<InkReportScreen> {
                               flex: 2,
                               child: TextField(
                                 controller: colorField.quantityController,
-                                keyboardType: TextInputType.numberWithOptions(
-                                    decimal: true),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                        decimal: true),
                                 inputFormatters: [
                                   FilteringTextInputFormatter.allow(
                                       RegExp(r'^\d*\.?\d{0,2}')),
