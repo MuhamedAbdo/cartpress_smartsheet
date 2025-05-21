@@ -22,13 +22,23 @@ class _WorkerDetailsScreenState extends State<WorkerDetailsScreen> {
   void _refresh() => setState(() {});
 
   @override
+  void initState() {
+    super.initState();
+
+    // إعادة الاتصال بالصندوق إذا انفصلت العلاقة
+    if (widget.worker.actions.box == null) {
+      widget.worker.reconnectActionsBox();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       drawer: const AppDrawer(),
       appBar: AppBar(
         centerTitle: true,
         title: Text(
-          "👤 ${widget.worker.name}",
+          "👤 ${widget.worker.name.isNotEmpty ? widget.worker.name : 'غير معروف'}",
         ),
       ),
       body: Padding(
@@ -36,8 +46,10 @@ class _WorkerDetailsScreenState extends State<WorkerDetailsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("📞 رقم الهاتف: ${widget.worker.phone}"),
-            Text("🛠 الوظيفة: ${widget.worker.job}"),
+            Text(
+                "📞 رقم الهاتف: ${widget.worker.phone.isNotEmpty ? widget.worker.phone : 'غير متوفر'}"),
+            Text(
+                "🛠 الوظيفة: ${widget.worker.job.isNotEmpty ? widget.worker.job : 'غير معرفة'}"),
             const SizedBox(height: 16),
             const Text("📜 الإجراءات",
                 style: TextStyle(fontWeight: FontWeight.bold)),
@@ -62,7 +74,7 @@ class _WorkerDetailsScreenState extends State<WorkerDetailsScreen> {
                                   Text(
                                       "🗓️ إلى: ${_formatDate(action.returnDate!)}"),
                                 if (action.notes?.isNotEmpty == true)
-                                  Text("📝 ملاحظات: ${action.notes}"),
+                                  Text("📝 ملاحظات: ${action.notes!}"),
                               ],
                             ),
                             trailing: Row(
@@ -244,24 +256,20 @@ class _WorkerDetailsScreenState extends State<WorkerDetailsScreen> {
                     notes: noteController.text,
                   );
                   final key = await actionBox.add(newAction);
-
                   if (index != null &&
                       index >= 0 &&
                       index < worker.actions.length) {
-                    // أولاً احذف الإجراء القديم من القائمة
                     worker.actions.removeAt(index);
-                    // ثم أدخل الإجراء الجديد في نفس المكان
                     worker.actions
-                        .insert(index, actionBox.get(key) as WorkerAction);
+                        .insert(index, actionBox.get(key)! as WorkerAction);
                   } else {
-                    // إضافة إجراء جديد
-                    worker.actions.add(actionBox.get(key) as WorkerAction);
+                    worker.actions.add(actionBox.get(key)! as WorkerAction);
                   }
                   await worker.save();
                   Navigator.pop(context);
                 } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text("❌ خطأ في حفظ الإجراء: ${e.toString()}")));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text("❌ خطأ في حفظ الإجراء: $e")));
                 }
               },
               child: const Text("✅ حفظ التعديلات"),

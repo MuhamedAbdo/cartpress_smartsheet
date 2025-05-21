@@ -85,6 +85,10 @@ class _WorkersScreenState extends State<WorkersScreen> {
             itemCount: box.length,
             itemBuilder: (context, index) {
               final worker = box.getAt(index)!;
+              // إعادة ربط actions بالصندوق إذا فُصلت
+              if (worker.actions.box == null) {
+                worker.reconnectActionsBox();
+              }
               return Card(
                 margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                 child: ListTile(
@@ -140,7 +144,11 @@ class _WorkersScreenState extends State<WorkersScreen> {
         TextEditingController(text: existingWorker?.name ?? '');
     final phoneController =
         TextEditingController(text: existingWorker?.phone ?? '');
-    String job = existingWorker?.job ?? 'مشرف';
+
+    final jobOptions = ['رئيس القسم', 'مشرف', 'فني', 'عامل', 'مساعد'];
+    String job = jobOptions.contains(existingWorker?.job)
+        ? (existingWorker?.job ?? 'مشرف')
+        : 'مشرف';
 
     showDialog(
       context: context,
@@ -162,14 +170,12 @@ class _WorkersScreenState extends State<WorkersScreen> {
                 ),
                 DropdownButtonFormField<String>(
                   value: job,
-                  items: const [
-                    DropdownMenuItem(
-                        value: 'رئيس القسم', child: Text('رئيس القسم')),
-                    DropdownMenuItem(value: 'مشرف', child: Text('مشرف')),
-                    DropdownMenuItem(value: 'فني', child: Text('فني')),
-                    DropdownMenuItem(value: 'عامل', child: Text('عامل')),
-                    DropdownMenuItem(value: 'مساعد', child: Text('مساعد')),
-                  ],
+                  items: jobOptions
+                      .map((val) => DropdownMenuItem(
+                            value: val,
+                            child: Text(val),
+                          ))
+                      .toList(),
                   onChanged: (val) => setState(() => job = val ?? 'مشرف'),
                   decoration: const InputDecoration(labelText: "🛠 الوظيفة"),
                 ),
@@ -182,21 +188,25 @@ class _WorkersScreenState extends State<WorkersScreen> {
               child: const Text("❌ إلغاء"),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
+                final workerActionsBox =
+                    Hive.box<WorkerAction>('worker_actions');
+                final List<WorkerAction> actionsList =
+                    existingWorker?.actions.toList() ?? [];
                 final newWorker = Worker(
                   name: nameController.text,
                   phone: phoneController.text,
                   job: job,
-                  actions: existingWorker?.actions ?? [],
+                  actions: actionsList,
                 );
 
                 if (existingWorker == null) {
-                  workerBox.add(newWorker);
+                  await workerBox.add(newWorker);
                 } else {
                   existingWorker.name = nameController.text;
                   existingWorker.phone = phoneController.text;
                   existingWorker.job = job;
-                  existingWorker.save();
+                  await existingWorker.save();
                 }
 
                 Navigator.pop(context);
@@ -210,6 +220,10 @@ class _WorkersScreenState extends State<WorkersScreen> {
   }
 
   void _showWorkerDetails(BuildContext context, Worker worker) {
+    // إعادة ربط actions بالصندوق إذا فُصلت
+    if (worker.actions.box == null) {
+      worker.reconnectActionsBox();
+    }
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -361,9 +375,12 @@ class _WorkersScreenState extends State<WorkersScreen> {
                     notes: noteController.text,
                   );
 
-                  actionBox.add(newAction);
-                  worker.actions.add(newAction);
-                  worker.save();
+                  // احفظ الإجراء في الصندوق ثم أضفه إلى القائمة
+                  final actionKey = await actionBox.add(newAction);
+                  final savedAction = actionBox.get(actionKey);
+
+                  worker.actions.add(savedAction!);
+                  await worker.save();
 
                   Navigator.pop(context);
                 } catch (e) {

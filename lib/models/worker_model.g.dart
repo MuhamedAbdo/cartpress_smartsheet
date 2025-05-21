@@ -17,10 +17,10 @@ class WorkerAdapter extends TypeAdapter<Worker> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return Worker(
-      name: fields[0] as String,
-      phone: fields[1] as String,
-      job: fields[2] as String,
-      actions: (fields[3] as List).cast<WorkerAction>(),
+      name: fields[0] as String?,
+      phone: fields[1] as String?,
+      job: fields[2] as String?,
+      actions: (fields[3] as List?)?.cast<WorkerAction>(),
     );
   }
 
