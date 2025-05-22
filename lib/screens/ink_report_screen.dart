@@ -713,14 +713,26 @@ class _InkReportScreenState extends State<InkReportScreen> {
             return true;
           }).toList()
             ..sort((a, b) {
-              final dateA = a.value['date'] ?? '';
-              final dateB = b.value['date'] ?? '';
-              final timeA = DateTime.tryParse(dateA);
-              final timeB = DateTime.tryParse(dateB);
+              final String? dateA = a.value['date'] as String?;
+              final String? dateB = b.value['date'] as String?;
+              final DateTime? timeA =
+                  dateA != null ? DateTime.tryParse(dateA) : null;
+              final DateTime? timeB =
+                  dateB != null ? DateTime.tryParse(dateB) : null;
+
               if (timeA != null && timeB != null) {
                 return timeB.compareTo(timeA); // الأحدث أولًا
+              } else if (timeA != null) {
+                return -1; // اعتبر الذي لديه تاريخ صحيح أحدث من الذي ليس لديه
+              } else if (timeB != null) {
+                return 1;
+              } else {
+                // لو كلاهما null أو غير قابل للتحويل لتاريخ، قارن كنصوص مع null safety
+                if (dateA == null && dateB == null) return 0;
+                if (dateA == null) return 1;
+                if (dateB == null) return -1;
+                return dateB.compareTo(dateA);
               }
-              return b.value['date'].compareTo(a.value['date']);
             });
 
           if (filteredRecordsWithKey.isEmpty) {

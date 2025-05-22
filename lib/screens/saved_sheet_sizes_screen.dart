@@ -197,6 +197,23 @@ class _SavedSheetSizesScreenState extends State<SavedSheetSizesScreen> {
     );
   }
 
+  String _extractDateOnly(String dateTimeString) {
+    // If dateTimeString is null or empty, return empty string
+    if (dateTimeString == null || dateTimeString.isEmpty) return '';
+    // Try to parse with DateTime, else fallback to splitting
+    try {
+      final date = DateTime.tryParse(dateTimeString);
+      if (date != null) {
+        return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+      }
+      // Fallback for string like "2024-05-10 22:12:23.123456"
+      final parts = dateTimeString.split(' ');
+      return parts.isNotEmpty ? parts[0] : dateTimeString;
+    } catch (e) {
+      return dateTimeString;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -299,10 +316,14 @@ class _SavedSheetSizesScreenState extends State<SavedSheetSizesScreen> {
 
               final key = filteredRecords[idx]['key'];
 
+              // استخدم فقط التاريخ بدون الوقت أو الرقم
+              final displayDate =
+                  _extractDateOnly(filteredRecords[idx]['date'] ?? '');
+
               return Card(
                 margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                 child: ListTile(
-                  title: Text("📅 التاريخ: ${filteredRecords[idx]['date']}"),
+                  title: Text("📅 التاريخ: $displayDate"),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -310,7 +331,8 @@ class _SavedSheetSizesScreenState extends State<SavedSheetSizesScreen> {
                       Text("📦 الصنف: ${record['productName']}"),
                       Text("🔢 كود الصنف: ${record['productCode'] ?? ''}"),
                       Text(
-                          "📏 المقاس: طول ${record['length']} × عرض ${record['width']} × ارتفاع ${record['height']}"),
+                        "📏 المقاس: طول ${record['length']} × عرض ${record['width']} × ارتفاع ${record['height']},",
+                      ),
                       if (record['isQuarterSize'] == true)
                         Text(
                           "(${record['isQuarterWidth'] == true ? 'عرض' : 'طول'})",

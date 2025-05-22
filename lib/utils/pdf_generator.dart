@@ -135,7 +135,7 @@ class PDFGenerator {
   }
 
   static Future<void> savePDF(pw.Document pdf, String fileName) async {
-    final output = await getExternalStorageDirectory();
+    final output = await getApplicationDocumentsDirectory();
     final file = File("${output!.path}/$fileName");
     await file.writeAsBytes(await pdf.save());
   }
